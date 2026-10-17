@@ -6,7 +6,7 @@ final class FolderPublicationTests: XCTestCase {
     let handle = Data(0..<16)
     let request = Flush.Request(messageId: 7, treeId: 9, sessionId: 11, fileId: handle)
     let bytes = request.encoded()
-    XCTAssertEqual(request.header.command, .flush)
+    XCTAssertEqual(request.header.command, Header.Command.flush.rawValue)
     XCTAssertEqual(bytes.count, 64 + 24)
     XCTAssertEqual(Array(bytes[64..<72]), [24, 0, 0, 0, 0, 0, 0, 0])
     XCTAssertEqual(bytes.suffix(16), handle)
