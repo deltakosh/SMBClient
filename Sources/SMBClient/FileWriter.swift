@@ -8,7 +8,7 @@ public class FileWriter {
 
   init(session: Session, path: String) {
     self.session = session
-    self.path = path.precomposedStringWithCanonicalMapping
+    self.path = path
   }
 
   public func upload(data: Data) async throws {
@@ -22,13 +22,16 @@ public class FileWriter {
     while offset < data.count {
       let buffer = data[offset..<min(offset + UInt64(session.maxWriteSize), UInt64(data.count))]
 
-      _ = try await session.write(
+      let response = try await session.write(
         data: buffer,
         fileId: fileProxy.id,
         offset: offset
       )
 
-      offset += UInt64(buffer.count)
+      guard response.count > 0, response.count <= buffer.count else {
+        throw URLError(.cannotWriteToFile)
+      }
+      offset += UInt64(response.count)
       progressHandler(Double(offset) / Double(data.count))
     }
   }
@@ -100,6 +103,12 @@ public class FileWriter {
         progressHandler(completedFiles, current, bytesSent)
       }
     }
+  }
+
+  /// Flush only an opened handle, including an intentionally empty file.
+  public func flush() async throws {
+    let proxy = try await fileProxy()
+    try await session.flush(fileId: proxy.id)
   }
 
   public func close() async throws {

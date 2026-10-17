@@ -298,6 +298,12 @@ public class Session {
   }
 
   @discardableResult
+  public func flush(fileId: Data) async throws -> Flush.Response {
+    try await send(Flush.Request(messageId: messageId.next(), treeId: treeId,
+                                 sessionId: sessionId, fileId: fileId))
+  }
+
+  @discardableResult
   public func close(fileId: Data) async throws -> Close.Response {
     let request = Close.Request(
       messageId: messageId.next(),
@@ -465,7 +471,7 @@ public class Session {
       shareAccess: [.read, .write, .delete],
       createDisposition: .create,
       createOptions: [.directoryFile],
-      name: path.precomposedStringWithCanonicalMapping
+      name: path
     )
     try await close(fileId: response.fileId)
     return response
@@ -549,7 +555,7 @@ public class Session {
     _ = try await send(createRequest, setInfoRequest, closeRequest)
   }
 
-  public func move(from: String, to: String) async throws {
+  public func move(from: String, to: String, replaceIfExists: Bool = false) async throws {
     let createRequest = Create.Request(
       messageId: messageId.next(),
       treeId: treeId,
@@ -568,7 +574,7 @@ public class Session {
       sessionId: sessionId,
       fileId: temporaryUUID,
       infoType: .file,
-      fileInformation: FileRenameInformation(fileName: to.precomposedStringWithCanonicalMapping)
+      fileInformation: FileRenameInformation(replaceIfExists: replaceIfExists, fileName: to)
     )
     let closeRequest = Close.Request(
       headerFlags: [.relatedOperations],

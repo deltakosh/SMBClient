@@ -79,15 +79,15 @@ public class SMBClient {
   }
 
   public func createDirectory(path: String) async throws {
-    try await session.createDirectory(path: Pathname.normalize(path.precomposedStringWithCanonicalMapping))
+    try await session.createDirectory(path: Pathname.normalize(path))
   }
 
-  public func rename(from: String, to: String) async throws {
-    try await move(from: Pathname.normalize(from), to: Pathname.normalize(to))
+  public func rename(from: String, to: String, replaceIfExists: Bool = false) async throws {
+    try await move(from: Pathname.normalize(from), to: Pathname.normalize(to), replaceIfExists: replaceIfExists)
   }
 
-  public func move(from: String, to: String) async throws {
-    try await session.move(from: Pathname.normalize(from), to: Pathname.normalize(to.precomposedStringWithCanonicalMapping))
+  public func move(from: String, to: String, replaceIfExists: Bool = false) async throws {
+    try await session.move(from: Pathname.normalize(from), to: Pathname.normalize(to), replaceIfExists: replaceIfExists)
   }
 
   public func deleteDirectory(path: String) async throws {
