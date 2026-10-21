@@ -37,7 +37,8 @@ public class Connection {
   public func connect() async throws {
     return try await withCheckedThrowingContinuation { (continuation) in
       // The start queue is concurrent: a `.waiting` and the `.cancelled` that a
-      // disconnect() causes can be delivered at the same time. Resume once.
+      // disconnect() causes can be delivered at the same time. Resume once; only
+      // a `.ready` that won installs the disconnect handler.
       let once = ResumeOnce(continuation)
       connection.stateUpdateHandler = { (state) in
         switch state {
@@ -47,8 +48,7 @@ public class Connection {
           once.resume(.failure(error))
           self.connection.stateUpdateHandler = nil
         case .ready:
-          once.resume(.success(()))
-          self.connection.stateUpdateHandler = stateUpdateHandler
+          if once.resume(.success(())) { self.connection.stateUpdateHandler = stateUpdateHandler }
         case .failed(let error):
           once.resume(.failure(error))
           self.connection.stateUpdateHandler = nil
@@ -263,11 +263,15 @@ private final class ResumeOnce: @unchecked Sendable {
     self.continuation = continuation
   }
 
-  func resume(_ result: Result<Void, Error>) {
+  /// True for the one call that resumed.
+  @discardableResult
+  func resume(_ result: Result<Void, Error>) -> Bool {
     lock.lock()
     let pending = continuation
     continuation = nil
     lock.unlock()
-    pending?.resume(with: result)
+    guard let pending else { return false }
+    pending.resume(with: result)
+    return true
   }
 }
