@@ -36,21 +36,24 @@ public class Connection {
 
   public func connect() async throws {
     return try await withCheckedThrowingContinuation { (continuation) in
+      // The start queue is concurrent: a `.waiting` and the `.cancelled` that a
+      // disconnect() causes can be delivered at the same time. Resume once.
+      let once = ResumeOnce(continuation)
       connection.stateUpdateHandler = { (state) in
         switch state {
         case .setup, .preparing:
           break
         case .waiting(let error):
-          continuation.resume(throwing: error)
+          once.resume(.failure(error))
           self.connection.stateUpdateHandler = nil
         case .ready:
-          continuation.resume()
+          once.resume(.success(()))
           self.connection.stateUpdateHandler = stateUpdateHandler
         case .failed(let error):
-          continuation.resume(throwing: error)
+          once.resume(.failure(error))
           self.connection.stateUpdateHandler = nil
         case .cancelled:
-          continuation.resume(throwing: ConnectionError.cancelled)
+          once.resume(.failure(ConnectionError.cancelled))
           self.connection.stateUpdateHandler = nil
         @unknown default:
           break
@@ -249,4 +252,22 @@ public enum ConnectionError: Error {
   case disconnected
   case cancelled
   case unknown
+}
+
+/// Resumes a connect continuation exactly once, whichever state update comes first.
+private final class ResumeOnce: @unchecked Sendable {
+  private let lock = NSLock()
+  private var continuation: CheckedContinuation<Void, Error>?
+
+  init(_ continuation: CheckedContinuation<Void, Error>) {
+    self.continuation = continuation
+  }
+
+  func resume(_ result: Result<Void, Error>) {
+    lock.lock()
+    let pending = continuation
+    continuation = nil
+    lock.unlock()
+    pending?.resume(with: result)
+  }
 }
